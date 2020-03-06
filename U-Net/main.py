@@ -47,7 +47,7 @@ def main():
             # val = np.squeeze(val)
             # val = Image.fromarray(val)
             # val.show()
-
+            print("s")
 
 if __name__ == "__main__":
     main()
