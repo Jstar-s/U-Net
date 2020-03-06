@@ -27,9 +27,9 @@ class Unet(data.Dataset):
         self.label_dir = os.listdir(os.path.join(path, 'labels'))
         if self.mode == 'train':
             self.images = [os.path.join(path, 'images', img) for img in self.image_dir]
-            print(self.images)
+            # print(self.images)
             self.labels = [os.path.join(path, 'labels', img) for img in self.label_dir]
-            print(self.labels)
+            # print(self.labels)
         if self.mode == 'test':
             self.images = [os.path.join(path, 'images', img) for img in self.image_dir]
             print(self.images)
@@ -39,10 +39,13 @@ class Unet(data.Dataset):
     def __getitem__(self, index):
         images = Image.open(self.images[index])
         labels = Image.open(self.labels[index])
+        images = images.convert("L")
+        labels = labels.convert("L")
+
         tf = tfs.Compose([
-            tfs.RandomRotation(15),
+            # tfs.RandomRotation(15),
             tfs.Resize((self.resize, self.resize)),
-            tfs.CenterCrop(self.resize),
+            # tfs.CenterCrop(self.resize),
             tfs.ToTensor(),
             tfs.Normalize(mean=[0], std=[1])
         ])
@@ -63,7 +66,8 @@ def main():
     data = Unet(".\\membrane\\train", 256, "train")
     train_loader = DataLoader(dataset=Unet(".\\membrane\\train", 256, "train"))
     x, y = next(iter(data))
-
+    print(x)
+    print(y)
     x = ToPILImage()(x)  # tensor转为PIL Image
     y = ToPILImage()(y)  # tensor转为PIL Image
 
