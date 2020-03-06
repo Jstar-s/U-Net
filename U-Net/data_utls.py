@@ -1,7 +1,7 @@
 import torch.utils.data as data
 import torchvision.transforms as tfs
 from torchvision.transforms import functional as FF
-import os,sys
+import sys
 sys.path.append('.')
 sys.path.append('..')
 import numpy as np
@@ -10,85 +10,67 @@ import random
 from PIL import Image
 from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
+from torchvision.transforms import ToPILImage
 from torchvision.utils import make_grid
+import  os, glob
+import  random, csv
 
-crop_size='whole_img'
+class Unet(data.Dataset):
+    # path对应图片路径， resize指定输出的图片大小，mode指定训练、测试等模式
+    def __init__(self, path, resize, mode):
+        super(Unet, self).__init__()
 
-# 展示图片
-def tensorShow(tensors,titles=None):
-        '''
-        t:BCWH
-        '''
-        fig=plt.figure()
-        for tensor,tit,i in zip(tensors,titles,range(len(tensors))):
-            img = make_grid(tensor)
-            npimg = img.numpy()
-            ax = fig.add_subplot(211+i)
-            ax.imshow(np.transpose(npimg, (1, 2, 0)))
-            ax.set_title(tit)
-        plt.show()
+        self.path = path
+        self.resize = resize
+        self.mode = mode
+        self.image_dir = os.listdir(os.path.join(path, 'images'))
+        self.label_dir = os.listdir(os.path.join(path, 'labels'))
+        if self.mode == 'train':
+            self.images = [os.path.join(path, 'images', img) for img in self.image_dir]
+            print(self.images)
+            self.labels = [os.path.join(path, 'labels', img) for img in self.label_dir]
+            print(self.labels)
+        if self.mode == 'test':
+            self.images = [os.path.join(path, 'images', img) for img in self.image_dir]
+            print(self.images)
+            self.labels = [os.path.join(path, 'labels', img) for img in self.label_dir]
+            print(self.labels)
 
-# 对数据集进行处理 //重点！！！
-class Unet_Dataset(data.Dataset):
-    def __init__(self, path, train, size=crop_size, format='.png'):
-        super(Unet_Dataset, self).__init__()
-        self.size= size
-        print('crop size', size)
-        self.train = train
-        self.format = format
-        # 图片位置生成
-        self.haze_imgs_dir=os.listdir(os.path.join(path,'image'))
-        self.haze_imgs=[os.path.join(path,'hazy',img) for img in self.haze_imgs_dir]
-        self.clear_dir=os.path.join(path,'clear')
     def __getitem__(self, index):
-        haze = Image.open(self.haze_imgs[index])
-        # 如果图片不满足尺寸要求重新从数据集随机取出一张代替
-        if isinstance(self.size,int):
-            while haze.size[0]<self.size or haze.size[1]<self.size :
-                index=random.randint(0,20000)
-                haze=Image.open(self.haze_imgs[index])
-        img=self.haze_imgs[index]
-        # 用/分割并取最后一部分再用_分割取第一部分
-        id=img.split('/')[-1].split('_')[0]
-        clear_name=id+self.format
-        clear=Image.open(os.path.join(self.clear_dir,clear_name))
-        clear=tfs.CenterCrop(haze.size[::-1])(clear)
-        if not isinstance(self.size,str):
-            i,j,h,w=tfs.RandomCrop.get_params(haze,output_size=(self.size,self.size))
-            haze=FF.crop(haze,i,j,h,w)
-            clear=FF.crop(clear,i,j,h,w)
-        haze,clear=self.augData(haze.convert("RGB") ,clear.convert("RGB") )
-        return haze,clear
-    def augData(self,data,target):
-        if self.train:
-            rand_hor=random.randint(0,1)
-            rand_rot=random.randint(0,3)
-            # 随机水平翻转
-            data=tfs.RandomHorizontalFlip(rand_hor)(data)
-            target=tfs.RandomHorizontalFlip(rand_hor)(target)
-            if rand_rot:
-                data=FF.rotate(data,90*rand_rot)
-                target=FF.rotate(target,90*rand_rot)
-        data=tfs.ToTensor()(data)
-        # 归一化
-        data=tfs.Normalize(mean=[0.64, 0.6, 0.58],std=[0.14,0.15, 0.152])(data)
-        target=tfs.ToTensor()(target)
-        return  data ,target
+        images = Image.open(self.images[index])
+        labels = Image.open(self.labels[index])
+        tf = tfs.Compose([
+            tfs.RandomRotation(15),
+            tfs.Resize((self.resize, self.resize)),
+            tfs.CenterCrop(self.resize),
+            tfs.ToTensor(),
+            tfs.Normalize(mean=[0], std=[1])
+        ])
+        # images = tfs.ToTensor()(images)
+        # images=tfs.Normalize(mean=[0], std=[1])(images)
+        # labels = tfs.ToTensor()(labels)
+        # labels = tfs.Normalize(mean=[0], std=[1])(labels)
+        images = tf(images)
+        labels = tf(labels)
+        return images, labels
+
     def __len__(self):
-        return len(self.haze_imgs)
+        return len(self.images)
 
-import os
-# 得到当前路径
-pwd=os.getcwd()
-print(pwd)
-path='/home/zhilin007/VS/FFA-Net/data'#path to your 'data' folder
 
-# 建立送入网络的数据的大小位置批量大小等信息
-ITS_train_loader=DataLoader(dataset=RESIDE_Dataset(path+'/RESIDE/ITS',train=True,size=crop_size),batch_size=BS,shuffle=True)
-ITS_test_loader=DataLoader(dataset=RESIDE_Dataset(path+'/RESIDE/SOTS/indoor',train=False,size='whole img'),batch_size=1,shuffle=False)
+def main():
 
-OTS_train_loader=DataLoader(dataset=RESIDE_Dataset(path+'/RESIDE/OTS',train=True,format='.jpg'),batch_size=BS,shuffle=True)
-OTS_test_loader=DataLoader(dataset=RESIDE_Dataset(path+'/RESIDE/SOTS/outdoor',train=False,size='whole img',format='.png'),batch_size=1,shuffle=False)
+    data = Unet(".\\membrane\\train", 256, "train")
+    train_loader = DataLoader(dataset=Unet(".\\membrane\\train", 256, "train"))
+    x, y = next(iter(data))
+
+    x = ToPILImage()(x)  # tensor转为PIL Image
+    y = ToPILImage()(y)  # tensor转为PIL Image
+
+    x.show()  # 显示图片
+    y.show()
+    print(x.size)
+
 
 if __name__ == "__main__":
-    pass
+    main()
