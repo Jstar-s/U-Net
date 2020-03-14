@@ -55,6 +55,9 @@ class Unet(data.Dataset):
         # labels = tfs.Normalize(mean=[0], std=[1])(labels)
         images = tf(images)
         labels = tf(labels)
+        for label in labels:
+            label[label > 0.5] = 1
+            label[label <= 0.5] = 0
         return images, labels
 
     def __len__(self):

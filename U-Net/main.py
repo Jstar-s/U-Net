@@ -12,17 +12,18 @@ from PIL import Image
 
 
 batchsz = 32
-lr = 1e-3
-epochs = 2
+lr = 1e-4
+epochs = 20
 
 device = torch.device('cuda')
-
+torch.manual_seed(1234)
 train_db = Unet(".\\membrane\\train", 256, "train")
 train_loader = DataLoader(train_db, batch_size=1, shuffle=True, num_workers=1)
 
 
 def evalute(model, loader):
     pass
+
 
 def main():
     model = U_net().to(device)
@@ -42,12 +43,18 @@ def main():
             loss.backward()
             optimizer.step()
             global_step += 1
-            print(logits)
+            B, C, H, W = logits.shape
+            y = np.squeeze(y)
+            logits = np.squeeze(logits)
+            logits[logits>0.5] = 1
+            logits[logits <= 0.5] = 0
+            acc = torch.mean((y == logits), dtype=float)
+            print(acc)
             # val = logits.cuda().data.cpu().numpy()
             # val = np.squeeze(val)
             # val = Image.fromarray(val)
             # val.show()
-            print("s")
+
 
 if __name__ == "__main__":
     main()
